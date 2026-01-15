@@ -1,0 +1,1304 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>围住小猫</title>
+  <style>
+    :root{
+      --size: clamp(26px, 6.2vw, 46px);
+      --gap: clamp(6px, 1.2vw, 10px);
+      --dot: #a9cdf8;
+      --blocked: #082a57;
+      --bg1: #f2f5fa;
+      --bg2: #dbe3ee;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      min-height:100svh;
+      display:grid;
+      place-items:center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(1200px 600px at 50% 30%, var(--bg1), var(--bg2));
+      color:#222;
+      -webkit-tap-highlight-color: transparent;
+      overflow-x:hidden;
+    }
+    .card{
+      width:min(920px, 96vw);
+      background:#fff;
+      border-radius:18px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.10);
+      padding: clamp(14px, 2.2vw, 22px);
+      position:relative;
+    }
+    .top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom: 10px;
+    }
+    .hint{
+      font-size: clamp(14px, 2.1vw, 18px);
+      color:#333;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      user-select:none;
+    }
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 6px 10px;
+      background: #f3f6fb;
+      border-radius: 999px;
+      color:#466;
+      font-size: 12px;
+    }
+    .btn{
+      border:none;
+      background:#1b6cff;
+      color:#fff;
+      padding:10px 14px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-weight:600;
+      font-size:14px;
+      box-shadow: 0 10px 20px rgba(27,108,255,.25);
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn.secondary{
+      background:#eef2f8;
+      color:#2a3550;
+      box-shadow:none;
+    }
+
+    .board-wrap{
+      display:flex;
+      justify-content:center;
+      padding: 10px 0 2px;
+      overflow:auto;
+    }
+    #board{
+      display:flex;
+      flex-direction:column;
+      gap: var(--gap);
+      padding: 6px 10px 12px;
+      touch-action: manipulation;
+      user-select:none;
+    }
+    .row{
+      display:flex;
+      gap: var(--gap);
+      justify-content:center;
+    }
+    .row.odd{
+      margin-left: calc((var(--size) + var(--gap)) / 2);
+    }
+    .cell{
+      width: var(--size);
+      height: var(--size);
+      border-radius: 999px;
+      border:none;
+      background: var(--dot);
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      transition: transform .06s ease, filter .12s ease, background .12s ease;
+      box-shadow: inset 0 -2px 0 rgba(255,255,255,.35);
+    }
+    .cell:hover{ filter: brightness(.98); }
+    .cell:active{ transform: scale(.96); }
+    .cell.blocked{
+      background: var(--blocked);
+      box-shadow:none;
+    }
+    .cell.cat{ background: var(--dot); }
+
+    .cat-icon{
+      width: calc(var(--size) * 0.78);
+      height: calc(var(--size) * 0.78);
+      color:#0a0a0a;
+      display:block;
+    }
+
+    .status{
+      margin-top: 10px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #f6f8fc;
+      border-radius: 14px;
+      color:#2a3550;
+      font-size: 13px;
+      flex-wrap:wrap;
+    }
+    .status strong{ font-weight:800; }
+
+    .shake{ animation: shake .35s ease-in-out 0s 1; }
+    @keyframes shake{
+      0%{ transform: translateX(0); }
+      20%{ transform: translateX(-6px); }
+      40%{ transform: translateX(6px); }
+      60%{ transform: translateX(-4px); }
+      80%{ transform: translateX(4px); }
+      100%{ transform: translateX(0); }
+    }
+
+    /* 弹窗 */
+    .overlay{
+      position: fixed;
+      inset: 0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: 18px;
+      z-index: 50;
+      background: rgba(10,18,35,.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+    .overlay.show{ display:flex; }
+    .modal{
+      width:min(520px, 92vw);
+      background:#fff;
+      border-radius: 18px;
+      box-shadow: 0 30px 100px rgba(0,0,0,.25);
+      padding: 18px 18px 16px;
+      position:relative;
+      overflow:hidden;
+      transform: translateY(10px) scale(.98);
+      opacity:0;
+      animation: pop .20s ease forwards;
+    }
+    @keyframes pop{ to{ transform: translateY(0) scale(1); opacity:1; } }
+    .modal .title{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size: 18px;
+      font-weight: 900;
+      color:#111;
+      margin-bottom: 8px;
+    }
+    .modal .sub{
+      color:#2a3550;
+      opacity:.9;
+      font-size: 14px;
+      line-height: 1.55;
+      margin: 8px 0 12px;
+    }
+    .modal .meta{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin: 10px 0 14px;
+    }
+    .pill{
+      background:#f3f6fb;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 12px;
+      color:#2a3550;
+    }
+    .modal .actions{
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      flex-wrap:wrap;
+      margin-top: 10px;
+    }
+    .modal .close-x{
+      position:absolute;
+      right:10px;
+      top:10px;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border:none;
+      background:#eef2f8;
+      color:#2a3550;
+      cursor:pointer;
+      font-weight:800;
+    }
+    .modal .ribbon{
+      position:absolute;
+      inset:auto -80px  -80px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 40px;
+      transform: rotate(25deg);
+      opacity: .12;
+      background: radial-gradient(circle at 30% 30%, #1b6cff, #8bd3ff);
+      pointer-events:none;
+    }
+
+    /* 彩带 */
+    #confetti{
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      pointer-events:none;
+      display:none;
+    }
+    #confetti.show{ display:block; }
+  </style>
+</head>
+
+<body>
+  <canvas id="confetti"></canvas>
+
+  <div class="card" id="card">
+    <div class="top">
+      <div class="hint">
+        <span class="badge">玩法</span>
+        <span>点击小圆点，围住小猫 🐾</span>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button id="resetBtn" class="btn secondary" type="button">重开</button>
+        <button id="hardBtn" class="btn" type="button">难度：普通</button>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <div id="board" aria-label="围住小猫游戏棋盘"></div>
+    </div>
+
+    <div class="status">
+      <div>
+        步数：<strong id="steps">0</strong>　|　
+        初始障碍：<strong id="blocks">10</strong>　|　
+        棋盘：<strong id="size">11×11</strong>
+      </div>
+      <div id="msg">别让它跑到边缘～</div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="游戏结果弹窗">
+    <div class="modal" id="modal">
+      <div class="ribbon"></div>
+      <button class="close-x" id="closeModal" type="button" aria-label="关闭">✕</button>
+      <div class="title" id="modalTitle">🎉 胜利！</div>
+      <div class="sub" id="modalSub">你把小猫围住了，它的逃跑路线被你“算法封死”。</div>
+      <div class="meta" id="modalMeta"></div>
+      <div class="actions">
+        <button class="btn secondary" id="keepPlaying" type="button">继续看棋盘</button>
+        <button class="btn" id="playAgain" type="button">再来一局</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const N = 11;
+  const INF = 1e9;
+
+  // ====== 参数（更贴合“到边缘不可达就输”的规则） ======
+  const RECENT_K = 10;
+  const RECENT_PENALTY = 120;
+  const VISIT_PENALTY = 35;
+  const BACK_PENALTY = 180;
+  const GOAL_STICKY = 3;
+
+  // 动量：减少横跳（延续同方向）
+  const MOMENTUM_BONUS = 140;
+
+  // 地狱：迭代加深（3→5→7）+ 时间预算
+  const HELL_MIN_DEPTH = 3;
+  const HELL_MAX_DEPTH = 7;
+  const HELL_BLOCK_CANDS = 22;
+  const HELL_TIME_BUDGET_MS = 110;
+
+  const CAT_SVG = `
+    <svg class="cat-icon" viewBox="0 0 64 64" aria-hidden="true">
+      <polygon points="18,20 12,8 24,14" fill="currentColor"></polygon>
+      <polygon points="46,20 40,14 52,8" fill="currentColor"></polygon>
+      <circle cx="32" cy="24" r="12" fill="currentColor"></circle>
+      <ellipse cx="32" cy="44" rx="14" ry="12" fill="currentColor"></ellipse>
+      <path d="M44 46 C56 44, 56 58, 44 56" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"></path>
+    </svg>
+  `;
+
+  const boardEl = document.getElementById('board');
+  const stepsEl = document.getElementById('steps');
+  const blocksEl = document.getElementById('blocks');
+  const sizeEl  = document.getElementById('size');
+  const msgEl   = document.getElementById('msg');
+  const cardEl  = document.getElementById('card');
+
+  const resetBtn = document.getElementById('resetBtn');
+  const hardBtn  = document.getElementById('hardBtn');
+
+  const overlay = document.getElementById('overlay');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalSub = document.getElementById('modalSub');
+  const modalMeta = document.getElementById('modalMeta');
+  const closeModalBtn = document.getElementById('closeModal');
+  const keepPlayingBtn = document.getElementById('keepPlaying');
+  const playAgainBtn = document.getElementById('playAgain');
+
+  const confettiCanvas = document.getElementById('confetti');
+  const ctx = confettiCanvas.getContext('2d');
+
+  sizeEl.textContent = `${N}×${N}`;
+
+  // ✅ 难度重平衡：规则更容易赢，所以“高难”要减少初始障碍
+  const difficulty = [
+    { name: "简单", blocks: 12, mode: "random" },
+    { name: "普通", blocks: 10, mode: "goal" },
+    { name: "困难", blocks: 7,  mode: "goal+" },
+    { name: "地狱", blocks: 5,  mode: "hell" },
+  ];
+
+  let diffIndex = 1;
+  let initialBlocks = difficulty[diffIndex].blocks;
+
+  // state: 0空 1障碍 2猫
+  let state;
+  let cells;
+  let cat = { x: Math.floor(N/2), y: Math.floor(N/2) };
+  let steps = 0;
+  let gameOver = false;
+
+  // 反横跳/循环记忆
+  let prevCat = null;
+  let lastDir = null;
+  let visits = null;
+  let recent = [];
+  // 目标出口（边缘点）
+  let goal = null;
+
+  // 搜索缓存
+  const TT = new Map();
+  const DP_EDGE_CACHE = new Map();
+  const EVAL_CACHE = new Map();
+
+  const winLines = [
+    "你把小猫围住了：逃生路径归零。",
+    "漂亮！这波是“六边形”围捕。",
+    "小猫：我不服，但我确实没路了。",
+    "胜利！你成功把它逼进了“局部最优陷阱”。"
+  ];
+  const loseLines = [
+    "它跑到边缘了：溜之大吉。",
+    "小猫：拜拜了您嘞～",
+    "失败！下一把要从“卡口”下手，不要只围外围。",
+    "你差一点点：它钻了最短路的空子。"
+  ];
+
+  // ===== 六邻接（odd-r offset） =====
+  function neighbors(x, y){
+    const odd = (y % 2) === 1;
+    const dirs = odd
+      ? [[-1,0],[1,0],[0,-1],[1,-1],[0,1],[1,1]]
+      : [[-1,0],[1,0],[-1,-1],[0,-1],[-1,1],[0,1]];
+    const res = [];
+    for (const [dx,dy] of dirs){
+      const nx = x + dx, ny = y + dy;
+      if (nx>=0 && nx<N && ny>=0 && ny<N) res.push([nx,ny]);
+    }
+    return res;
+  }
+  function isEdge(x,y){ return x===0 || y===0 || x===N-1 || y===N-1; }
+  function isFreeIn(st,x,y){ return st[y][x] !== 1; }
+
+  function pushRecent(x,y){
+    recent.unshift({x,y});
+    if (recent.length > RECENT_K) recent.pop();
+  }
+  function inRecent(x,y){
+    for (const p of recent) if (p.x===x && p.y===y) return true;
+    return false;
+  }
+
+  function momentumBonus(cx,cy,nx,ny){
+    if (!lastDir) return 0;
+    const dx = nx - cx, dy = ny - cy;
+    return (dx===lastDir.dx && dy===lastDir.dy) ? MOMENTUM_BONUS : 0;
+  }
+
+  // ===== Hash =====
+  function hashState(st, cx, cy){
+    let h1 = 2166136261 >>> 0;
+    let h2 = 2166136261 >>> 0;
+
+    let idx = 1;
+    for (let y=0;y<N;y++){
+      for (let x=0;x<N;x++){
+        if (st[y][x] === 1){
+          const v = (idx * 2654435761) >>> 0;
+          h1 ^= v; h1 = Math.imul(h1, 16777619) >>> 0;
+          h2 ^= (v ^ 0x9e3779b9); h2 = Math.imul(h2, 2246822519) >>> 0;
+        }
+        idx++;
+      }
+    }
+    h1 ^= (cx + cy * N + 17) >>> 0; h1 = Math.imul(h1, 16777619) >>> 0;
+    h2 ^= (cx * 131 + cy * 911 + 97) >>> 0; h2 = Math.imul(h2, 2246822519) >>> 0;
+
+    return (h1 >>> 0) + ":" + (h2 >>> 0);
+  }
+
+  // ===== BFS：从边缘出发，求 distToEdge + pathsToEdge =====
+  function computeDistAndPathsToEdge(st){
+    const key = hashState(st, -1, -1);
+    const cached = DP_EDGE_CACHE.get(key);
+    if (cached) return cached;
+
+    const dist = Array.from({length:N}, () => Array(N).fill(INF));
+    const q = [];
+
+    for (let y=0;y<N;y++){
+      for (let x=0;x<N;x++){
+        if (!isEdge(x,y)) continue;
+        if (!isFreeIn(st,x,y)) continue;
+        dist[y][x] = 0;
+        q.push([x,y]);
+      }
+    }
+
+    let qi = 0;
+    while (qi < q.length){
+      const [x,y] = q[qi++];
+      const d = dist[y][x];
+      for (const [nx,ny] of neighbors(x,y)){
+        if (!isFreeIn(st,nx,ny)) continue;
+        if (dist[ny][nx] > d + 1){
+          dist[ny][nx] = d + 1;
+          q.push([nx,ny]);
+        }
+      }
+    }
+
+    const cellsByDist = [];
+    for (let y=0;y<N;y++){
+      for (let x=0;x<N;x++){
+        if (dist[y][x] < INF) cellsByDist.push([x,y,dist[y][x]]);
+      }
+    }
+    cellsByDist.sort((a,b)=>a[2]-b[2]);
+
+    const paths = Array.from({length:N}, () => Array(N).fill(0));
+    const CAP = 1_000_000;
+    for (const [x,y,d] of cellsByDist){
+      if (d === 0){
+        paths[y][x] = 1;
+      } else {
+        let sum = 0;
+        for (const [nx,ny] of neighbors(x,y)){
+          if (dist[ny][nx] === d - 1){
+            sum += paths[ny][nx];
+            if (sum > CAP){ sum = CAP; break; }
+          }
+        }
+        paths[y][x] = sum;
+      }
+    }
+
+    const out = { dist, paths };
+    DP_EDGE_CACHE.set(key, out);
+    return out;
+  }
+
+  // ✅ 正确判胜：到不了边缘就输了（玩家赢）
+  function catCannotReachEdge(){
+    const dp = computeDistAndPathsToEdge(state);
+    return dp.dist[cat.y][cat.x] >= INF;
+  }
+
+  // ✅ 新增：从某点 flood-fill，返回连通域面积 + 可达边缘格数量（对新规则强对齐）
+  function areaAndReachableEdges(st, sx, sy){
+    if (!isFreeIn(st,sx,sy)) return {area:0, edges:0};
+    const seen = Array.from({length:N}, () => Array(N).fill(false));
+    const q = [[sx,sy]];
+    seen[sy][sx] = true;
+    let qi=0, area=0, edges=0;
+    while (qi<q.length){
+      const [x,y] = q[qi++]; area++;
+      if (isEdge(x,y)) edges++;
+      for (const [nx,ny] of neighbors(x,y)){
+        if (!isFreeIn(st,nx,ny)) continue;
+        if (seen[ny][nx]) continue;
+        seen[ny][nx] = true;
+        q.push([nx,ny]);
+      }
+    }
+    return {area, edges};
+  }
+
+  // ===== BFS：从猫出发到所有格子的 distFromCat + pathCount =====
+  function bfsFromCatCountPaths(st, sx, sy){
+    const dist = Array.from({length:N}, () => Array(N).fill(INF));
+    const paths = Array.from({length:N}, () => Array(N).fill(0));
+    const CAP = 1_000_000;
+
+    dist[sy][sx] = 0;
+    paths[sy][sx] = 1;
+    const q = [[sx,sy]];
+    let qi = 0;
+
+    while (qi < q.length){
+      const [x,y] = q[qi++];
+      const d = dist[y][x];
+      for (const [nx,ny] of neighbors(x,y)){
+        if (!isFreeIn(st,nx,ny)) continue;
+        if (dist[ny][nx] > d + 1){
+          dist[ny][nx] = d + 1;
+          paths[ny][nx] = paths[y][x];
+          q.push([nx,ny]);
+        } else if (dist[ny][nx] === d + 1){
+          paths[ny][nx] = Math.min(CAP, paths[ny][nx] + paths[y][x]);
+        }
+      }
+    }
+    return { dist, paths };
+  }
+
+  // ===== BFS：从 goal 出发 =====
+  function bfsFromGoal(st, gx, gy){
+    const dist = Array.from({length:N}, () => Array(N).fill(INF));
+    if (!isFreeIn(st,gx,gy)) return dist;
+    dist[gy][gx] = 0;
+    const q = [[gx,gy]];
+    let qi = 0;
+    while (qi < q.length){
+      const [x,y] = q[qi++];
+      const d = dist[y][x];
+      for (const [nx,ny] of neighbors(x,y)){
+        if (!isFreeIn(st,nx,ny)) continue;
+        if (dist[ny][nx] > d + 1){
+          dist[ny][nx] = d + 1;
+          q.push([nx,ny]);
+        }
+      }
+    }
+    return dist;
+  }
+
+  function freeDegree(st, x, y){
+    let c = 0;
+    for (const [nx,ny] of neighbors(x,y)) if (isFreeIn(st,nx,ny)) c++;
+    return c;
+  }
+
+  // ===== 评估：对齐新规则（出口数量/连通域更重要） =====
+  function evalPos(st, x, y){
+    if (!isFreeIn(st,x,y)) return -1e12;
+    if (isEdge(x,y)) return 1e12;
+
+    const key = "E|" + hashState(st, x, y);
+    const cached = EVAL_CACHE.get(key);
+    if (cached !== undefined) return cached;
+
+    const dp = computeDistAndPathsToEdge(st);
+    const d = dp.dist[y][x];
+    if (d >= INF) { EVAL_CACHE.set(key, -1e12); return -1e12; }
+
+    const p = dp.paths[y][x];
+    const deg = freeDegree(st,x,y);
+    const ae = areaAndReachableEdges(st, x, y);
+
+    // 核心：更近边缘更好，但“可达边缘数量 edges”更重要（防被切断）
+    let s =
+      90000
+      - d * 1600
+      + Math.log(1 + p) * 1200
+      + deg * 260
+      + ae.area * 16
+      + Math.log(1 + ae.edges) * 2200
+      + ae.edges * 35;
+
+    if (prevCat && x===prevCat.x && y===prevCat.y) s -= BACK_PENALTY;
+    if (inRecent(x,y)) s -= RECENT_PENALTY;
+    if (visits) s -= (visits[y][x] || 0) * VISIT_PENALTY;
+
+    EVAL_CACHE.set(key, s);
+    return s;
+  }
+
+  // ===== 目标选择：最近出口里选“通路最丰富”的，goal 有黏性 =====
+  function pickBestGoal(st, cx, cy){
+    const bc = bfsFromCatCountPaths(st, cx, cy);
+    const dist = bc.dist, paths = bc.paths;
+
+    let bestExitDist = INF;
+    for (let y=0;y<N;y++){
+      for (let x=0;x<N;x++){
+        if (!isEdge(x,y)) continue;
+        bestExitDist = Math.min(bestExitDist, dist[y][x]);
+      }
+    }
+    if (bestExitDist >= INF) return { goal:null, bestExitDist };
+
+    let best = null;
+    for (let y=0;y<N;y++){
+      for (let x=0;x<N;x++){
+        if (!isEdge(x,y)) continue;
+        if (dist[y][x] !== bestExitDist) continue;
+        const sc = paths[y][x] * 100000 + (y * -100) + (x * -1);
+        if (!best || sc > best.sc) best = {x,y,sc};
+      }
+    }
+    return { goal: best ? {x:best.x,y:best.y} : null, bestExitDist };
+  }
+
+  function ensureGoal(st, cx, cy){
+    const picked = pickBestGoal(st, cx, cy);
+    if (!goal){ goal = picked.goal; return; }
+    if (!goal){ goal = picked.goal; return; }
+
+    const distToCur = bfsFromGoal(st, goal.x, goal.y)[cy][cx];
+    if (distToCur >= INF){
+      goal = picked.goal;
+      return;
+    }
+
+    if (picked.bestExitDist < INF && distToCur > picked.bestExitDist + GOAL_STICKY){
+      goal = picked.goal;
+    }
+  }
+
+  // ===== 普通/困难：沿 goal 走一步（稳定） =====
+  function stepTowardGoal(st, cx, cy, stronger){
+    if (!goal) return null;
+    const distGoal = bfsFromGoal(st, goal.x, goal.y);
+    const curD = distGoal[cy][cx];
+    if (curD >= INF) return null;
+
+    const want = curD - 1;
+
+    let best = null;
+    for (const [nx,ny] of neighbors(cx,cy)){
+      if (!isFreeIn(st,nx,ny)) continue;
+      const nd = distGoal[ny][nx];
+      if (nd !== want) continue;
+
+      let score = evalPos(st,nx,ny) + momentumBonus(cx,cy,nx,ny);
+      if (!stronger) score += 80; // 普通更“直”
+      const tie = -(ny*100 + nx);
+
+      if (!best || score > best.score || (score === best.score && tie > best.tie)){
+        best = {x:nx,y:ny,score,tie};
+      }
+    }
+
+    if (!best){
+      let fb = null;
+      for (const [nx,ny] of neighbors(cx,cy)){
+        if (!isFreeIn(st,nx,ny)) continue;
+        const score = evalPos(st,nx,ny) + momentumBonus(cx,cy,nx,ny);
+        const tie = -(ny*100 + nx);
+        if (!fb || score > fb.score || (score === fb.score && tie > fb.tie)){
+          fb = {x:nx,y:ny,score,tie};
+        }
+      }
+      return fb ? [fb.x, fb.y] : null;
+    }
+
+    return [best.x, best.y];
+  }
+
+  // ===== 地狱：玩家可能堵的关键点 =====
+  function candidateBlocksForPlayer(st, cx, cy){
+    const bc = bfsFromCatCountPaths(st, cx, cy);
+    const distC = bc.dist;
+
+    const dpE = computeDistAndPathsToEdge(st);
+    const distE = dpE.dist, pathsE = dpE.paths;
+
+    let minExit = INF;
+    for (let y=0;y<N;y++){
+      for (let x=0;x<N;x++){
+        if (!isEdge(x,y)) continue;
+        minExit = Math.min(minExit, distC[y][x]);
+      }
+    }
+
+    const picked = new Map();
+    const add = (x,y,score) => {
+      if (!isFreeIn(st,x,y)) return;
+      if (x===cx && y===cy) return;
+      const k = x + "," + y;
+      const old = picked.get(k);
+      if (!old || score > old.score) picked.set(k, {x,y,score});
+    };
+
+    if (minExit < INF){
+      for (let y=0;y<N;y++){
+        for (let x=0;x<N;x++){
+          if (!isFreeIn(st,x,y)) continue;
+          if (distC[y][x] >= INF || distE[y][x] >= INF) continue;
+          if (distC[y][x] + distE[y][x] === minExit){
+            const sc = 5200 + Math.log(1 + pathsE[y][x]) * 260 - distC[y][x] * 50;
+            add(x,y,sc);
+            for (const [nx,ny] of neighbors(x,y)){
+              add(nx,ny,sc - 220);
+            }
+          }
+        }
+      }
+    }
+
+    const R = 4;
+    const seen = Array.from({length:N}, () => Array(N).fill(false));
+    const q = [[cx,cy,0]];
+    seen[cy][cx] = true;
+    let qi=0;
+    while (qi<q.length){
+      const [x,y,step] = q[qi++];
+      if (!(x===cx && y===cy) && isFreeIn(st,x,y) && distE[y][x] < INF){
+        const sc = 3600 - step*240 - distE[y][x]*150 + Math.log(1 + pathsE[y][x]) * 280;
+        add(x,y,sc);
+      }
+      if (step === R) continue;
+      for (const [nx,ny] of neighbors(x,y)){
+        if (!isFreeIn(st,nx,ny)) continue;
+        if (seen[ny][nx]) continue;
+        seen[ny][nx] = true;
+        q.push([nx,ny,step+1]);
+      }
+    }
+
+    const global = [];
+    for (let y=0;y<N;y++){
+      for (let x=0;x<N;x++){
+        if (!isFreeIn(st,x,y)) continue;
+        if (x===cx && y===cy) continue;
+        if (distE[y][x] >= INF) continue;
+        const imp = Math.log(1 + pathsE[y][x]) * 520 - distE[y][x] * 190;
+        global.push({x,y,imp});
+      }
+    }
+    global.sort((a,b)=>b.imp-a.imp);
+    for (let i=0; i<22 && i<global.length; i++){
+      add(global[i].x, global[i].y, 2600 + global[i].imp);
+    }
+
+    return Array.from(picked.values())
+      .sort((a,b)=>b.score-a.score)
+      .slice(0, HELL_BLOCK_CANDS);
+  }
+
+  // ===== 地狱：minimax（max=猫走，min=玩家堵） =====
+  let searchDeadline = 0;
+
+  function genCatMoves(st, cx, cy){
+    const moves = [];
+    for (const [nx,ny] of neighbors(cx,cy)){
+      if (!isFreeIn(st,nx,ny)) continue;
+      moves.push([nx,ny]);
+    }
+    moves.sort((a,b)=>{
+      const sb = evalPos(st,b[0],b[1]) + momentumBonus(cx,cy,b[0],b[1]);
+      const sa = evalPos(st,a[0],a[1]) + momentumBonus(cx,cy,a[0],a[1]);
+      return sb - sa;
+    });
+    return moves;
+  }
+
+  function terminalScore(st, cx, cy){
+    if (isEdge(cx,cy)) return 1e12;
+
+    let any = false;
+    for (const [nx,ny] of neighbors(cx,cy)){
+      if (isFreeIn(st,nx,ny)){ any=true; break; }
+    }
+    if (!any) return -1e12;
+
+    const dp = computeDistAndPathsToEdge(st);
+    if (dp.dist[cy][cx] >= INF) return -1e12; // ✅ 新规则下，这就是必输态
+
+    return null;
+  }
+
+  function maxNode(st, cx, cy, depth, alpha, beta){
+    if (performance.now() > searchDeadline) return evalPos(st,cx,cy);
+
+    const term = terminalScore(st,cx,cy);
+    if (term !== null) return term;
+    if (depth === 0) return evalPos(st,cx,cy);
+
+    const key = "M|" + depth + "|" + hashState(st,cx,cy);
+    const cached = TT.get(key);
+    if (cached !== undefined) return cached;
+
+    const moves = genCatMoves(st,cx,cy);
+    let best = -1e18;
+
+    for (const [nx,ny] of moves){
+      st[cy][cx] = 0;
+      st[ny][nx] = 2;
+      const savedPrev = prevCat;
+      prevCat = {x:cx,y:cy};
+
+      const val = minNode(st,nx,ny,depth-1,alpha,beta);
+
+      prevCat = savedPrev;
+      st[ny][nx] = 0;
+      st[cy][cx] = 2;
+
+      if (val > best) best = val;
+      if (best > alpha) alpha = best;
+      if (alpha >= beta) break;
+    }
+
+    TT.set(key, best);
+    return best;
+  }
+
+  function minNode(st, cx, cy, depth, alpha, beta){
+    if (performance.now() > searchDeadline) return evalPos(st,cx,cy);
+
+    const term = terminalScore(st,cx,cy);
+    if (term !== null) return term;
+    if (depth === 0) return evalPos(st,cx,cy);
+
+    const key = "m|" + depth + "|" + hashState(st,cx,cy);
+    const cached = TT.get(key);
+    if (cached !== undefined) return cached;
+
+    const blocks = candidateBlocksForPlayer(st,cx,cy);
+
+    blocks.sort((a,b)=>{
+      st[a.y][a.x]=1;
+      const va = evalPos(st,cx,cy);
+      st[a.y][a.x]=0;
+
+      st[b.y][b.x]=1;
+      const vb = evalPos(st,cx,cy);
+      st[b.y][b.x]=0;
+
+      return va - vb;
+    });
+
+    let best = 1e18;
+
+    for (const b of blocks){
+      st[b.y][b.x] = 1;
+      const val = maxNode(st,cx,cy,depth-1,alpha,beta);
+      st[b.y][b.x] = 0;
+
+      if (val < best) best = val;
+      if (best < beta) beta = best;
+      if (alpha >= beta) break;
+    }
+
+    TT.set(key, best);
+    return best;
+  }
+
+  function chooseMoveHell(st, cx, cy){
+    ensureGoal(st,cx,cy);
+
+    searchDeadline = performance.now() + HELL_TIME_BUDGET_MS;
+    if (TT.size > 14000) TT.clear();
+
+    const moves = genCatMoves(st,cx,cy);
+    if (moves.length === 0) return null;
+
+    for (const [nx,ny] of moves){
+      if (isEdge(nx,ny)) return [nx,ny];
+    }
+
+    // ✅ 迭代加深：在时间预算内尽可能搜索更深
+    let bestMove = moves[0];
+    let bestVal = -1e18;
+
+    for (let depth = HELL_MIN_DEPTH; depth <= HELL_MAX_DEPTH; depth += 2){
+      if (performance.now() > searchDeadline) break;
+
+      let localBestMove = bestMove;
+      let localBestVal = -1e18;
+
+      for (const [nx,ny] of moves){
+        if (performance.now() > searchDeadline) break;
+
+        st[cy][cx] = 0;
+        st[ny][nx] = 2;
+
+        const savedPrev = prevCat;
+        prevCat = {x:cx,y:cy};
+
+        const val = minNode(st,nx,ny,depth-1,-1e18,1e18);
+
+        prevCat = savedPrev;
+        st[ny][nx] = 0;
+        st[cy][cx] = 2;
+
+        let tie = momentumBonus(cx,cy,nx,ny);
+        if (goal){
+          const dg = bfsFromGoal(st, goal.x, goal.y);
+          tie += -((dg[ny][nx] || 0) * 2);
+        }
+
+        if (val > localBestVal || (val === localBestVal && tie > 0)){
+          localBestVal = val;
+          localBestMove = [nx,ny];
+        }
+      }
+
+      // 用更深的结果更新
+      bestMove = localBestMove;
+      bestVal = localBestVal;
+    }
+
+    return bestMove;
+  }
+
+  // ====== 选择猫下一步 ======
+  function chooseMove(st, cx, cy, mode){
+    if (mode === "random"){
+      const opts = [];
+      for (const [nx,ny] of neighbors(cx,cy)){
+        if (isFreeIn(st,nx,ny)) opts.push([nx,ny]);
+      }
+      if (!opts.length) return null;
+      return opts[(Math.random()*opts.length)|0];
+    }
+
+    if (mode === "hell"){
+      return chooseMoveHell(st,cx,cy);
+    }
+
+    ensureGoal(st,cx,cy);
+    const stronger = (mode === "goal+");
+    return stepTowardGoal(st,cx,cy,stronger);
+  }
+
+  // ===== UI 渲染 =====
+  function updateCell(x,y){
+    const el = cells[y][x];
+    el.className = "cell";
+    el.innerHTML = "";
+    if (state[y][x] === 1) el.classList.add("blocked");
+    if (state[y][x] === 2){
+      el.classList.add("cat");
+      el.innerHTML = CAT_SVG;
+    }
+  }
+  function setState(x,y,v){
+    state[y][x] = v;
+    updateCell(x,y);
+  }
+  function setAll(){
+    for (let y=0;y<N;y++) for (let x=0;x<N;x++) updateCell(x,y);
+  }
+
+  function buildBoard(){
+    boardEl.innerHTML = "";
+    cells = Array.from({length:N}, () => Array(N).fill(null));
+    for (let y=0; y<N; y++){
+      const row = document.createElement("div");
+      row.className = "row" + ((y%2) ? " odd" : "");
+      for (let x=0; x<N; x++){
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "cell";
+        btn.dataset.x = x;
+        btn.dataset.y = y;
+        btn.setAttribute("aria-label", `格子 ${x+1},${y+1}`);
+        btn.addEventListener("click", onCellClick, { passive: true });
+        row.appendChild(btn);
+        cells[y][x] = btn;
+      }
+      boardEl.appendChild(row);
+    }
+  }
+
+  function randomBlock(){
+    const candidates = [];
+    for (let y=0; y<N; y++){
+      for (let x=0; x<N; x++){
+        if (x===cat.x && y===cat.y) continue;
+        candidates.push([x,y]);
+      }
+    }
+    for (let i=candidates.length-1; i>0; i--){
+      const j = (Math.random()*(i+1))|0;
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+    let placed = 0;
+    for (const [x,y] of candidates){
+      if (placed >= initialBlocks) break;
+      if (state[y][x] === 0){
+        state[y][x] = 1;
+        placed++;
+      }
+    }
+  }
+
+  // ===== 结果弹窗 =====
+  function showModal(win){
+    const title = win ? "🎉 胜利！" : "😼 失败！";
+    const line = win
+      ? winLines[(Math.random()*winLines.length)|0]
+      : loseLines[(Math.random()*loseLines.length)|0];
+
+    modalTitle.textContent = title;
+    modalSub.textContent = line;
+
+    modalMeta.innerHTML = "";
+    const pills = [
+      `步数：${steps}`,
+      `难度：${difficulty[diffIndex].name}`,
+      `初始障碍：${initialBlocks}`,
+      `AI：${difficulty[diffIndex].mode}`,
+    ];
+    for (const p of pills){
+      const s = document.createElement("div");
+      s.className = "pill";
+      s.textContent = p;
+      modalMeta.appendChild(s);
+    }
+
+    overlay.classList.add("show");
+    if (win) startConfetti(1600);
+    else {
+      cardEl.classList.remove("shake");
+      void cardEl.offsetWidth;
+      cardEl.classList.add("shake");
+    }
+  }
+  function hideModal(){ overlay.classList.remove("show"); }
+  function endGame(win){
+    gameOver = true;
+    msgEl.textContent = win ? "你赢了：小猫被围住啦。" : "你输了：小猫跑到边缘了。";
+    showModal(win);
+  }
+
+  closeModalBtn.addEventListener("click", hideModal);
+  keepPlayingBtn.addEventListener("click", hideModal);
+  playAgainBtn.addEventListener("click", newGame);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) hideModal(); });
+
+  // ===== 游戏流程 =====
+  function newGame(){
+    hideModal();
+    stopConfetti();
+
+    gameOver = false;
+    steps = 0;
+    stepsEl.textContent = steps;
+
+    initialBlocks = difficulty[diffIndex].blocks;
+    blocksEl.textContent = initialBlocks;
+
+    msgEl.textContent = "别让它跑到边缘～";
+    cat = { x: Math.floor(N/2), y: Math.floor(N/2) };
+
+    prevCat = null;
+    lastDir = null;
+    visits = Array.from({length:N}, () => Array(N).fill(0));
+    recent = [];
+    pushRecent(cat.x, cat.y);
+    visits[cat.y][cat.x] = 1;
+
+    goal = null;
+
+    TT.clear();
+    DP_EDGE_CACHE.clear();
+    EVAL_CACHE.clear();
+
+    for (let attempt=0; attempt<140; attempt++){
+      state = Array.from({length:N}, () => Array(N).fill(0));
+      state[cat.y][cat.x] = 2;
+      randomBlock();
+
+      const dp = computeDistAndPathsToEdge(state);
+      if (dp.dist[cat.y][cat.x] > 0 && dp.dist[cat.y][cat.x] < INF){
+        setAll();
+        ensureGoal(state, cat.x, cat.y);
+        return;
+      }
+    }
+    setAll();
+    ensureGoal(state, cat.x, cat.y);
+  }
+
+  function catMove(){
+    const mode = difficulty[diffIndex].mode;
+
+    // 如果玩家已经切断连通性，直接判胜（玩家赢）
+    if (catCannotReachEdge()){
+      endGame(true);
+      return;
+    }
+
+    if (isEdge(cat.x, cat.y)){
+      endGame(false);
+      return;
+    }
+
+    const move = chooseMove(state, cat.x, cat.y, mode);
+    if (!move){
+      endGame(true);
+      return;
+    }
+
+    const old = {x: cat.x, y: cat.y};
+    const nx = move[0], ny = move[1];
+
+    setState(cat.x, cat.y, 0);
+    cat.x = nx; cat.y = ny;
+    setState(cat.x, cat.y, 2);
+
+    prevCat = old;
+    lastDir = { dx: cat.x - old.x, dy: cat.y - old.y };
+
+    visits[cat.y][cat.x] = (visits[cat.y][cat.x] || 0) + 1;
+    pushRecent(cat.x, cat.y);
+
+    if (isEdge(cat.x, cat.y)){
+      endGame(false);
+      return;
+    }
+
+    // 猫走进死区也算你赢
+    if (catCannotReachEdge()){
+      endGame(true);
+    }
+  }
+
+  function onCellClick(e){
+    if (gameOver) return;
+    const x = +e.currentTarget.dataset.x;
+    const y = +e.currentTarget.dataset.y;
+    if (state[y][x] !== 0) return;
+
+    setState(x,y,1);
+    steps++;
+    stepsEl.textContent = steps;
+
+    // ✅ 你落子后就检查：到不了边缘立刻胜利
+    if (catCannotReachEdge()){
+      endGame(true);
+      return;
+    }
+
+    catMove();
+  }
+
+  resetBtn.addEventListener("click", newGame);
+  hardBtn.addEventListener("click", () => {
+    diffIndex = (diffIndex + 1) % difficulty.length;
+    initialBlocks = difficulty[diffIndex].blocks;
+    blocksEl.textContent = initialBlocks;
+    hardBtn.textContent = `难度：${difficulty[diffIndex].name}`;
+    newGame();
+  });
+
+  // ===== Confetti =====
+  let confettiParticles = [];
+  let confettiRAF = 0;
+  let confettiEndAt = 0;
+
+  function resizeCanvas(){
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    confettiCanvas.width = Math.floor(window.innerWidth * dpr);
+    confettiCanvas.height = Math.floor(window.innerHeight * dpr);
+    confettiCanvas.style.width = window.innerWidth + "px";
+    confettiCanvas.style.height = window.innerHeight + "px";
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener("resize", resizeCanvas, { passive: true });
+
+  function startConfetti(durationMs = 1200){
+    resizeCanvas();
+    confettiCanvas.classList.add("show");
+    confettiEndAt = performance.now() + durationMs;
+
+    const count = Math.min(220, Math.floor((window.innerWidth * window.innerHeight) / 6500) + 80);
+    confettiParticles = [];
+    const colors = ["#1b6cff", "#8bd3ff", "#ffd36b", "#ff6bd6", "#7dffb2", "#ffffff"];
+
+    for (let i=0; i<count; i++){
+      confettiParticles.push({
+        x: Math.random() * window.innerWidth,
+        y: -20 - Math.random() * 200,
+        vx: (Math.random() - 0.5) * 2.2,
+        vy: 2.0 + Math.random() * 3.6,
+        w: 6 + Math.random() * 6,
+        h: 10 + Math.random() * 10,
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 0.18,
+        color: colors[(Math.random()*colors.length)|0],
+        alpha: 0.9,
+      });
+    }
+
+    cancelAnimationFrame(confettiRAF);
+    confettiRAF = requestAnimationFrame(tickConfetti);
+  }
+
+  function stopConfetti(){
+    cancelAnimationFrame(confettiRAF);
+    confettiRAF = 0;
+    confettiParticles = [];
+    confettiCanvas.classList.remove("show");
+    ctx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+  }
+
+  function tickConfetti(t){
+    ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+
+    if (t < confettiEndAt){
+      for (let k=0; k<2; k++){
+        if (confettiParticles.length < 260){
+          confettiParticles.push({
+            x: Math.random() * window.innerWidth,
+            y: -30,
+            vx: (Math.random() - 0.5) * 2.4,
+            vy: 2.2 + Math.random() * 3.8,
+            w: 6 + Math.random() * 6,
+            h: 10 + Math.random() * 10,
+            rot: Math.random() * Math.PI,
+            vr: (Math.random() - 0.5) * 0.20,
+            color: ["#1b6cff","#8bd3ff","#ffd36b","#ff6bd6","#7dffb2","#ffffff"][(Math.random()*6)|0],
+            alpha: 0.9,
+          });
+        }
+      }
+    }
+
+    for (const p of confettiParticles){
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      p.vy += 0.015;
+      p.vx *= 0.999;
+
+      const sway = Math.sin((p.y * 0.03) + p.rot) * 0.6;
+      const x = p.x + sway;
+
+      ctx.save();
+      ctx.translate(x, p.y);
+      ctx.rotate(p.rot);
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      ctx.restore();
+    }
+
+    confettiParticles = confettiParticles.filter(p => p.y < window.innerHeight + 60);
+
+    if (t >= confettiEndAt && confettiParticles.length === 0){
+      stopConfetti();
+      return;
+    }
+    confettiRAF = requestAnimationFrame(tickConfetti);
+  }
+
+  // init
+  buildBoard();
+  hardBtn.textContent = `难度：${difficulty[diffIndex].name}`;
+  newGame();
+})();
+</script>
+</body>
+</html>
